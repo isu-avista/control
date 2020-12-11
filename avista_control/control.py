@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+import json
 import logging
 import functools
 import pika
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -9,6 +11,7 @@ LOGGER = logging.getLogger(__name__)
 class MQObject(ABC):
     EXCHANGE = 'message'
     EXCHANGE_TYPE = 'topic'
+    PUBLISH_INTERVAL = 1
     QUEUE = 'text'
     ROUTING_KEY = 'example.text'
 
@@ -18,12 +21,7 @@ class MQObject(ABC):
         self._url = amqp_url
 
     def connect(self):
-        """This method connects to RabbitMQ, returning the connection handle.
-        When the connection is established, the on_connection_open method
-        will be invoked by pika.
-        :rtype: pika.SelectConnection
-        """
-        LOGGER.info('Connecting to %s', self._url)
+        print(f"Connecting to {self._url}")
         return pika.SelectConnection(
             parameters=pika.URLParameters(self._url),
             on_open_callback=self.on_connection_open,
@@ -31,12 +29,7 @@ class MQObject(ABC):
             on_close_callback=self.on_connection_closed)
 
     def on_connection_open(self, _unused_connection):
-        """This method is called by pika once the connection to RabbitMQ has
-        been established. It passes the handle to the connection object in
-        case we need it, but in this case, we'll just mark it unused.
-        :param pika.SelectConnection _unused_connection: The connection
-        """
-        LOGGER.info('Connection opened')
+        print('Connection opened')
         self.open_channel()
 
     @abstractmethod
@@ -48,30 +41,17 @@ class MQObject(ABC):
         pass
 
     def open_channel(self):
-        """This method will open a new channel with RabbitMQ by issuing the
-        Channel.Open RPC command. When RabbitMQ confirms the channel is open
-        by sending the Channel.OpenOK RPC reply, the on_channel_open method
-        will be invoked.
-        """
-        LOGGER.info('Creating a new channel')
+        print('Creating a new channel')
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
-        """This method is invoked by pika when the channel has been opened.
-        The channel object is passed in so we can make use of it.
-        Since the channel is now open, we'll declare the exchange to use.
-        :param pika.channel.Channel channel: The channel object
-        """
-        LOGGER.info('Channel opened')
+        print('Channel opened')
         self._channel = channel
         self.add_on_channel_close_callback()
         self.setup_exchange(self.EXCHANGE)
 
     def add_on_channel_close_callback(self):
-        """This method tells pika to call the on_channel_closed method if
-        RabbitMQ unexpectedly closes the channel.
-        """
-        LOGGER.info('Adding channel close callback')
+        print('Adding channel close callback')
         self._channel.add_on_close_callback(self.on_channel_closed)
 
     @abstractmethod
@@ -79,12 +59,7 @@ class MQObject(ABC):
         pass
 
     def setup_exchange(self, exchange_name):
-        """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
-        command. When it is complete, the on_exchange_declareok method will
-        be invoked by pika.
-        :param str|unicode exchange_name: The name of the exchange to declare
-        """
-        LOGGER.info('Declaring exchange: %s', exchange_name)
+        print(f"Declaring exchange: {exchange_name}")
         # Note: using functools.partial is not required, it is demonstrating
         # how arbitrary data can be passed to the callback when it is called
         cb = functools.partial(
@@ -95,32 +70,16 @@ class MQObject(ABC):
             callback=cb)
 
     def on_exchange_declareok(self, _unused_frame, userdata):
-        """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
-        command.
-        :param pika.Frame.Method _unused_frame: Exchange.DeclareOk response frame
-        :param str|unicode userdata: Extra user data (exchange name)
-        """
-        LOGGER.info('Exchange declared: %s', userdata)
+        print(f"Exchange declared: {userdata}")
         self.setup_queue(self.QUEUE)
 
     @abstractmethod
     def setup_queue(self, queue_name):
         pass
 
-    @abstractmethod
-    def on_queue_declareok(self, _unused_frame):
-        pass
-
-    @abstractmethod
-    def on_bindok(self, _unused_frame):
-        pass
-
     def close_channel(self):
-        """Invoke this command to close the channel with RabbitMQ by sending
-        the Channel.Close RPC command.
-        """
         if self._channel is not None:
-            LOGGER.info('Closing the channel')
+            print('Closing the channel')
             self._channel.close()
 
     @abstractmethod
@@ -128,7 +87,7 @@ class MQObject(ABC):
         pass
 
 
-class Publisher(MQObject):
+class Publisher(MQObject, ABC):
 
     def __init__(self, amqp_url):
         super().__init__(amqp_url)
@@ -138,61 +97,124 @@ class Publisher(MQObject):
         self._message_number = None
         self._stopping = False
 
+    def run(self):
+        while not self._stopping:
+            self._connection = None
+            self._deliveries = []
+            self._acked = 0
+            self._nacked = 0
+            self._message_number = 0
+
+            try:
+                self._connection = self.connect()
+                self._connection.ioloop.start()
+            except KeyboardInterrupt:
+                self.stop()
+                if (self._connection is not None and
+                        not self._connection.is_closed):
+                    # Finish closing
+                    self._connection.ioloop.start()
+
+        print('Stopped')
+
     def on_connection_open_error(self, _unused_connection, err):
-        pass
+        print(f"Connection open failed, reopening in 5 seconds: {err}")
+        self._connection.ioloop.call_later(5, self._connection.ioloop.stop)
 
     def on_connection_closed(self, _unused_connection, reason):
-        pass
-
-    def reconnect(self):
-        pass
+        self._channel = None
+        if self._stopping:
+            self._connection.ioloop.stop()
+        else:
+            print(f"Connection closed, reopening in 5 seconds: {reason}")
+            self._connection.ioloop.call_later(5, self._connection.ioloop.stop)
 
     def on_channel_closed(self, channel, reason):
-        pass
+        self._channel = None
+        if self._stopping:
+            self._connection.ioloop.stop()
+        else:
+            print(f"Connection closed, reopening in 5 seconds: {reason}")
+            self._connection.ioloop.call_later(5, self._connection.ioloop.stop)
 
     def setup_queue(self, queue_name):
-        pass
+        print(f"Declaring queue: {queue_name}")
+        self._channel.queue_declare(
+            queue=queue_name, callback=self.on_queue_declareok)
 
     def on_queue_declareok(self, _unused_frame):
-        pass
+        print(f"Binding {self.EXCHANGE} to {self.QUEUE} with {self.ROUTING_KEY}")
+        self._channel.queue_bind(
+            self.QUEUE,
+            self.EXCHANGE,
+            routing_key=self.ROUTING_KEY,
+            callback=self.on_bindok)
 
     def on_bindok(self, _unused_frame):
-        pass
+        print('Queue bound')
+        self.start_publishing()
 
-    def set_qos(self):
-        pass
+    def start_publishing(self):
+        print('Issuing consumer related RPC commands')
+        self.enable_delivery_confirmations()
+        self.schedule_next_message()
 
-    def on_basic_qos_ok(self, _unused_frame):
-        pass
+    def enable_delivery_confirmations(self):
+        print('Issuing Confirm.Select RPC command')
+        self._channel.confirm_delivery(self.on_delivery_confirmation)
 
-    def start_consuming(self):
-        pass
+    def on_delivery_confirmation(self, method_frame):
+        confirmation_type = method_frame.method.NAME.split('.')[1].lower()
+        print(f"Received {confirmation_type} for delivery tag: {method_frame.method.delivery_tag}")
+        if confirmation_type == 'ack':
+            self._acked += 1
+        elif confirmation_type == 'nack':
+            self._nacked += 1
+        self._deliveries.remove(method_frame.method.delivery_tag)
+        print(
+            f"Published {self._message_number} messages, {len(self._deliveries)} have yet to be confirmed, "
+            f"{self._acked} were acked and {self._nacked} were nacked"
+        )
 
-    def add_on_cancel_callback(self):
-        pass
+    def schedule_next_message(self):
+        print(f"Scheduling next message for {self.PUBLISH_INTERVAL} seconds")
+        self._connection.ioloop.call_later(self.PUBLISH_INTERVAL,
+                                           self.publish_message)
 
-    def on_consumer_cancelled(self, method_frame):
-        pass
+    def publish_message(self):
+        if self._channel is None or not self._channel.is_open:
+            return
 
-    def on_message(self, _unused_channel, basic_deliver, properties, body):
-        pass
+        hdrs = {u'مفتاح': u' قيمة', u'键': u'值', u'キー': u'値'}
+        properties = pika.BasicProperties(
+            app_id='example-publisher',
+            content_type='application/json',
+            headers=hdrs)
 
-    def acknowledge_message(self, delivery_tag):
-        pass
-
-    def stop_consuming(self):
-        pass
-
-    def on_cancelok(self, _unused_frame, userdata):
-        pass
+        message = u'hello'
+        self._channel.basic_publish(self.EXCHANGE, self.ROUTING_KEY,
+                                    json.dumps(message, ensure_ascii=False),
+                                    properties)
+        self._message_number += 1
+        self._deliveries.append(self._message_number)
+        print(f"Published message # {self._message_number}")
+        #self.schedule_next_message()
 
     def close_connection(self):
-        pass
+        if self._connection is not None:
+            print('Closing connection')
+            self._connection.close()
+
+    def stop(self):
+        print('Stopping')
+        self._stopping = True
+        self.close_channel()
+        self.close_connection()
 
 
-class Consumer(MQObject):
+class Consumer(MQObject, ABC):
 
-    def __init_(self, amqp_url):
+    def __init__(self, amqp_url):
         super().__init__(amqp_url)
         self.should_reconnect = False
         self.was_consuming = False
@@ -201,38 +223,113 @@ class Consumer(MQObject):
         self._consuming = False
         self._prefetch_count = 1
 
+    def run(self):
+        self._connection = self.connect()
+        self._connection.ioloop.start()
+
     def on_connection_open_error(self, _unused_connection, err):
-        pass
+        print(f"Connection open failed: {err}")
+        self.reconnect()
 
     def on_connection_closed(self, _unused_connection, reason):
-        pass
+        self._channel = None
+        if self._closing:
+            self._connection.ioloop.stop()
+        else:
+            print(f"Connection closed, reconnect necessary: {reason}")
+            self.reconnect()
+
+    def reconnect(self):
+        self.should_reconnect = True
+        self.stop()
 
     def on_channel_closed(self, channel, reason):
-        pass
+        print(f"Channel {channel} was closed: {reason}")
+        self.close_connection()
 
     def setup_queue(self, queue_name):
-        pass
+        print(f"Declaring queue: {queue_name}")
+        cb = functools.partial(self.on_queue_declareok, userdata=queue_name)
+        self._channel.queue_declare(queue=queue_name, callback=cb)
 
-    def on_queue_declareok(self, _unused_frame):
-        pass
+    def on_queue_declareok(self, _unused_frame, userdata):
+        queue_name = userdata
+        print(f"Binding {self.EXCHANGE} to {queue_name} with {self.ROUTING_KEY}")
+        cb = functools.partial(self.on_bindok, userdata=queue_name)
+        self._channel.queue_bind(
+            queue_name,
+            self.EXCHANGE,
+            routing_key=self.ROUTING_KEY,
+            callback=cb)
 
-    def on_bindok(self, _unused_frame):
-        pass
+    def on_bindok(self, _unused_frame, userdata):
+        print(f"Queue bound: {userdata}")
+        self.set_qos()
 
-    def start_publishing(self):
-        pass
+    def set_qos(self):
+        self._channel.basic_qos(
+            prefetch_count=self._prefetch_count, callback=self.on_basic_qos_ok)
 
-    def enable_delivery_confirmations(self):
-        pass
+    def on_basic_qos_ok(self, _unused_frame):
+        print(f"QOS set to: {self._prefetch_count}")
+        self.start_consuming()
 
-    def on_delivery_confirmation(self, method_frame):
-        pass
+    def start_consuming(self):
+        print('Issuing consumer related RPC commands')
+        self.add_on_cancel_callback()
+        self._consumer_tag = self._channel.basic_consume(
+            self.QUEUE, self.on_message)
+        self.was_consuming = True
+        self._consuming = True
 
-    def schedule_next_message(self):
-        pass
+    def add_on_cancel_callback(self):
+        print('Adding consumer cancellation callback')
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
-    def publish_message(self):
-        pass
+    def on_consumer_cancelled(self, method_frame):
+        print(f"Consumer was cancelled remotely, shutting down: {method_frame}")
+        if self._channel:
+            self._channel.close()
+
+    def on_message(self, _unused_channel, basic_deliver, properties, body):
+        print(f"Received message # {basic_deliver.delivery_tag} from {properties.app_id}: {body}")
+        self.acknowledge_message(basic_deliver.delivery_tag)
+
+    def acknowledge_message(self, delivery_tag):
+        print(f"Acknowledging message {delivery_tag}")
+        self._channel.basic_ack(delivery_tag)
+
+    def stop_consuming(self):
+        if self._channel:
+            print('Sending a Basic.Cancel RPC command to RabbitMQ')
+            cb = functools.partial(
+                self.on_cancelok, userdata=self._consumer_tag)
+            self._channel.basic_cancel(self._consumer_tag, cb)
+
+    def on_cancelok(self, _unused_frame, userdata):
+        self._consuming = False
+        print(f"RabbitMQ acknowledged the cancellation of the consumer: {userdata}")
+        self.close_channel()
+
+    def close_channel(self):
+        print('Closing the channel')
+        self._channel.close()
 
     def close_connection(self):
-        pass
+        self._consuming = False
+        if self._connection.is_closing or self._connection.is_closed:
+            print('Connection is closing or already closed')
+        else:
+            print('Closing connection')
+            self._connection.close()
+
+    def stop(self):
+        if not self._closing:
+            self._closing = True
+            print('Stopping')
+            if self._consuming:
+                self.stop_consuming()
+                self._connection.ioloop.start()
+            else:
+                self._connection.ioloop.stop()
+            print('Stopped')
