@@ -13,9 +13,9 @@ class MQObject(ABC):
         self._connection = None
         self._channel = None
 
-    def connect(self):
+    def connect(self, host):
         self._connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host='localhost'))
+            pika.ConnectionParameters(host=host))
 
     def create_channel(self):
         self._channel = self._connection.channel()
