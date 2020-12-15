@@ -30,7 +30,7 @@ class Consumer(MQObject, ABC):
         super().__init__()
 
     def create_queue(self):
-        self._channel.declare_queue(queue='rpc_queue')
+        self._channel.queue_declare(queue='rpc_queue')
 
     # This method will execute once a task is received
     # and then send the result back to the publisher
