@@ -1,57 +1,5 @@
 from abc import ABC, abstractmethod
-import pika
-
-
-class MQObject(ABC):
-    """Abstract message queuing class.
-
-    Attributes:
-        **_connection (object)**: pika connection to RabbitMQ server
-        **_channel (object)**: connection channel
-    """
-    def __init__(self):
-        """MQObject constructor."""
-        self._connection = None
-        self._channel = None
-
-    def connect(self, host):
-        """Connects to RabbitMQ server.
-
-        Args:
-            **host (str)**: host address
-        """
-        self._connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=host))
-
-    def create_channel(self):
-        """Creates a channel on the connection."""
-        self._channel = self._connection.channel()
-
-    @abstractmethod
-    def create_queue(self):
-        pass
-
-
-class Consumer(MQObject, ABC):
-    """Abstract consumer class."""
-
-    def __init__(self):
-        """Consumer constructor."""
-        super().__init__()
-
-    def create_queue(self):
-        """Creates a queue on the connection channel."""
-        self._channel.queue_declare(queue='rpc_queue')
-
-    @abstractmethod
-    def on_request(self, ch, method, props, body):
-        pass
-
-    def start_consuming(self):
-        """Starts consuming on the connection channel"""
-        self._channel.basic_qos(prefetch_count=1)
-        self._channel.basic_consume(queue='rpc_queue', on_message_callback=self.on_request)
-        self._channel.start_consuming()
+from mqobject import MQObject
 
 
 class Publisher(MQObject, ABC):
