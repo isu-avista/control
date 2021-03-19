@@ -1,0 +1,17 @@
+[Unit]
+Description=ISU-Avista Control Service
+Requires=docker.service
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/local/bin/docker-compose -f /opt/avista/control.yml up -d --remove-orphans
+ExecStop=/usr/local/bin/docker-compose -f /opt/avista/control.yml down -v
+WorkingDirectory=/opt/avista
+User=avista
+
+[Install]
+WantedBy=multi-user.target
+
+

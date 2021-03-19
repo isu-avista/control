@@ -1,0 +1,9 @@
+version: "3.3"
+
+services:
+
+  backend:
+    image: isuese/avista-control:latest
+    command: /usr/bin/python3 app.py
+    network_mode: host
+    privileged: True
