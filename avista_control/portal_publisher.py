@@ -16,7 +16,7 @@ class PortalPublisher(Publisher):
     def __init__(self):
         """Constructs a new PortalPublisher."""
         super().__init__()
-        self._config = load_config('./conf/config.yml')
+        self.config = load_config('./conf/config.yml')
 
     def call(self, task):
         """Publishes a message to consumer with task and data.

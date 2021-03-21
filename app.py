@@ -21,6 +21,7 @@ def run_publisher():
         publisher.post_prediction_data(response)
 
         # sleep
+        time.sleep(float(publisher.config['periodicity']))
 
 
 if __name__ == '__main__':
