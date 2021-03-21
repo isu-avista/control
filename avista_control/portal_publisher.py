@@ -40,5 +40,5 @@ class PortalPublisher(Publisher):
         """Gets any uncollected data from avista portal"""
         pass
 
-    def post_prediction_data(self):
+    def post_prediction_data(self, response):
         pass
