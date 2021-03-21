@@ -1,6 +1,10 @@
 # get base image
 FROM ubuntu:latest
 
+ARG hostname
+ARG hostport
+ARG periodicity
+
 # create working direcotry
 WORKDIR ./
 
@@ -17,3 +21,5 @@ RUN pip3 install -r requirements.txt
 
 # copy application files
 COPY ./ ./
+
+RUN python3 generate_configs.py -p $periodicity -s $hostname -r $hostport
