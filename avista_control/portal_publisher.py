@@ -1,7 +1,13 @@
 import uuid
 import json
 import pika
+import yaml
 from avista_control.publisher import Publisher
+
+
+def load_config(file):
+    with open(file, 'r') as f:
+        return yaml.load(f, Loader=yaml.FullLoader)
 
 
 class PortalPublisher(Publisher):
@@ -10,6 +16,7 @@ class PortalPublisher(Publisher):
     def __init__(self):
         """Constructs a new PortalPublisher."""
         super().__init__()
+        self._config = load_config('./conf/config.yml')
 
     def call(self, task):
         """Publishes a message to consumer with task and data.
@@ -41,4 +48,5 @@ class PortalPublisher(Publisher):
         pass
 
     def post_prediction_data(self, response):
+        """Posts prediction data to avista portal"""
         pass
