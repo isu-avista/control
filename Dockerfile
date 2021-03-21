@@ -4,6 +4,7 @@ FROM ubuntu:latest
 ARG hostname
 ARG hostport
 ARG periodicity
+ARG timestamp
 
 # create working direcotry
 WORKDIR ./

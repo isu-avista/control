@@ -10,7 +10,8 @@ def init_argparse() -> argparse.ArgumentParser:
         description="Generate configuration files for Avista Control`",
         epilog="Copyright (C) 2020, 2021 Idaho State University Empirical SE Lab"
     )
-    parser.add_argument("-p", "--periodicity", action="store", type=str, required=True, help="DBMS Username")
+    parser.add_argument("-p", "--periodicity", action="store", type=str, required=True, help="Sleep Periodicity")
+    parser.add_argument("-t", "--timestamp", action="store", type=str, required=True, help="Last Data Timestamp")
     parser.add_argument("-s", "--hostname", action="store", type=str, required=True, help="Server Host Name")
     parser.add_argument("-r", "--hostport", action="store", type=str, required=True, help="Server Host Port")
     parser.add_argument("-v", "--version", action="version", version=f'{parser.prog} version 1.0.0')
@@ -18,11 +19,12 @@ def init_argparse() -> argparse.ArgumentParser:
     return parser
 
 
-def generate_server_config(periodicity, hostname, hostport):
+def generate_server_config(periodicity, timestamp, hostname, hostport):
     config = {
         'service': {
             'host': hostname,
             'port': hostport,
+            'last_ts': timestamp,
             'periodicity': periodicity,
         }
     }
@@ -37,10 +39,11 @@ def main() -> None:
     dic = vars(args)
 
     periodicity = dic['periodicity']
+    timestamp = dic['last_ts']
     host = dic['hostname']
     port = dic['hostport']
 
-    generate_server_config(periodicity, host, port)
+    generate_server_config(periodicity, timestamp, host, port)
 
 
 if __name__ == '__main__':

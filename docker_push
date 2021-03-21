@@ -4,6 +4,7 @@ echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
 docker build \
        --build-arg periodicity=5.0 \
+       --build-arg timestamp=0 \
        --build-arg hostname=0.0.0.0 \
        --build-arg hostport=5000 \
        -t isuese/avista-control:latest .
