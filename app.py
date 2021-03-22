@@ -15,10 +15,10 @@ def run_publisher():
         data = publisher.get_data()
 
         # send message with data if any
-        response = publisher.call(data)
-
-        # post result back to portal
-        publisher.post_prediction_data(response)
+        # and post result back to portal
+        if data is not None:
+            response = publisher.call(data)
+            publisher.post_prediction_data(response)
 
         # sleep
         time.sleep(float(publisher.config['periodicity']))
