@@ -1,0 +1,18 @@
+{
+  "task": {
+    "action": "predict",
+    "model": "perceptron"
+  },
+  "data": {
+    "point1": {
+      "values": [1, 2, 3],
+      "device_id": 123,
+      "timestamp": 123
+    },
+    "point2": {
+      "values": [4, 5, 6],
+      "device_id": 456,
+      "timestamp": 456
+    }
+  }
+}
