@@ -1,5 +1,4 @@
-service:
-  host: localhost
-  port: 5000
-  periodicity: 5.0
-  last_ts: 0
+host: 192.168.0.180
+last_ts: 0
+periodicity: 5.0
+port: 5000

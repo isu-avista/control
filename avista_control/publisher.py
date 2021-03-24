@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from mqobject import MQObject
+from avista_control.mqobject import MQObject
 
 
 class Publisher(MQObject, ABC):
