@@ -1,16 +1,18 @@
 {
-  "predictions": {
-    "prediction1": {
-      "type": 0,
-      "name": "name",
-      "description": "no issue on device 123",
-      "device_id": 123
-    },
-    "prediction2": {
-      "type": 1,
-      "name": "name",
-      "description": "maintenance required on device 456",
-      "device_id": 456
-    }
-  }
+    "predictions": [
+        {
+        "value": 0, 
+        "type": "NO_MAINT_REQD",
+        "name": "name",
+        "description": "no issue on device 123",
+        "device_id": 124
+        },
+        {
+        "value": 1,
+        "type": "MAINT_REQD",
+        "name": "name",
+        "description": "maintenance required on device 456",
+        "device_id": 456
+        }
+    ]
 }
