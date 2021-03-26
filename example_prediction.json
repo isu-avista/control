@@ -1,0 +1,16 @@
+{
+  "predictions": {
+    "prediction1": {
+      "type": 0,
+      "name": "name",
+      "description": "no issue on device 123",
+      "device_id": 123
+    },
+    "prediction2": {
+      "type": 1,
+      "name": "name",
+      "description": "maintenance required on device 456",
+      "device_id": 456
+    }
+  }
+}

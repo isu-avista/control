@@ -65,6 +65,7 @@ class PortalPublisher(Publisher):
 
         self.update_last_timestamp(oldest_timestamp)
 
-    def post_prediction_data(self, response):
+    def post_prediction_data(self, predictions):
         """Posts prediction data to avista portal"""
-        pass
+        if predictions:
+            requests.post(f"http://{self.config['host']}:{self.config['port']}/api/ml-data", data=predictions)
