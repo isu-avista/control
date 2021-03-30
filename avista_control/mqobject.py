@@ -14,14 +14,14 @@ class MQObject(ABC):
         self._connection = None
         self._channel = None
 
-    def connect(self, host):
+    def connect(self, url):
         """Connects to RabbitMQ server.
 
         Args:
-            **host (str)**: host address
+            **url (str)**: rabbitmq connection url
         """
         self._connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=host))
+            pika.URLParameters(url))
 
     def create_channel(self):
         """Creates a channel on the connection."""

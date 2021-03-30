@@ -38,7 +38,7 @@ class PortalPublisher(Publisher):
         while self._response is None:
             self._connection.process_data_events()
 
-        return self._response
+        return json.loads(self._response)
 
     def load_config(self, file):
         with open(file, 'r') as f:
